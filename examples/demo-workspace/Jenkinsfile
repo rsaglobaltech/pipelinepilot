@@ -1,0 +1,28 @@
+@Library('platform-lib') _
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps { echo 'Cloning repo...' }
+        }
+        stage('Build') {
+            steps { echo 'Compiling...'; echo 'Artifacts ready' }
+        }
+        stage('Quality Gates') {
+            parallel {
+                stage('Unit Tests')        { steps { echo 'unit: 142 passed' } }
+                stage('Integration Tests') { steps { echo 'integration: 37 passed' } }
+                stage('Lint')              { steps { echo 'lint: 0 issues' } }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                // type 'dep' here -> shared library completion suggests deploy()
+                // Ctrl+Click on deploy -> jumps to shared-lib/vars/deploy.groovy
+                echo 'ready to deploy'
+            }
+        }
+    }
+}

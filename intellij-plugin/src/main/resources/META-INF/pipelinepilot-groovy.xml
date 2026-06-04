@@ -1,0 +1,30 @@
+<idea-plugin>
+    <!--
+      Groovy-dependent extensions. Loaded only when org.intellij.groovy is present
+      (via the optional <depends config-file> in plugin.xml). Keeping the
+      language="Groovy" extensions here — instead of the main descriptor — is the
+      required IntelliJ pattern; it lets the core plugin (settings, tool window,
+      services) register independently of the Groovy plugin.
+    -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Inline validation diagnostics for Jenkinsfiles. -->
+        <externalAnnotator
+            language="Groovy"
+            implementationClass="com.pipelinepilot.validation.JenkinsfileExternalAnnotator"/>
+
+        <!-- Shared library awareness: step completion, navigation, @Library annotation. -->
+        <completion.contributor
+            language="Groovy"
+            implementationClass="com.pipelinepilot.library.SharedLibraryCompletionContributor"/>
+        <gotoDeclarationHandler
+            implementation="com.pipelinepilot.library.SharedLibraryGotoDeclarationHandler"/>
+        <annotator
+            language="Groovy"
+            implementationClass="com.pipelinepilot.library.SharedLibraryAnnotator"/>
+
+        <!-- Inline gutter markers for AI review findings. -->
+        <annotator
+            language="Groovy"
+            implementationClass="com.pipelinepilot.ai.AiFindingsAnnotator"/>
+    </extensions>
+</idea-plugin>

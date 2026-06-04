@@ -1,0 +1,43 @@
+# Jenkins Configuration-as-Code for the PipelinePilot demo.
+jenkins:
+  systemMessage: "PipelinePilot demo Jenkins — companion plugin loaded. IDE API at /ide/*"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: admin
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+
+jobs:
+  - script: >
+      pipelineJob('demo-complex-pipeline') {
+        definition {
+          cps {
+            sandbox(true)
+            script('''
+              pipeline {
+                agent any
+                stages {
+                  stage('Checkout') { steps { echo 'checkout' } }
+                  stage('Build')    { steps { echo 'build' } }
+                  stage('Tests') {
+                    parallel {
+                      stage('Unit')        { steps { echo 'unit' } }
+                      stage('Integration') { steps { echo 'integration' } }
+                    }
+                  }
+                  stage('Deploy') { steps { echo 'deploy' } }
+                }
+              }
+            ''')
+          }
+        }
+      }

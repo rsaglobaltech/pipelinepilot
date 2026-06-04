@@ -1,0 +1,275 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_DIR = '/var/jenkins_home/products-api'
+        GRADLE = './gradlew --no-daemon --console=plain'
+        DOCKER_IMAGE = 'products-api'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_CONTAINER = 'products-api-app'
+        // Demo Jenkins runs in Docker and owns host port 8080. Deploy the app on the
+        // shared compose network and reach it by container name (no host-port clash).
+        DOCKER_NETWORK = 'pipelinepilot_default'
+        APP_URL = "http://products-api-app:8080"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        echo "Building Products API - Build #${env.BUILD_NUMBER}"
+                        dir("${APP_DIR}") {
+                            sh 'git status || true'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Compile') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh 'chmod +x gradlew'
+                            sh "${GRADLE} clean classes"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh "${GRADLE} unitTest"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    junit testResults: '**/build/test-results/unitTest/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh "${GRADLE} integrationTest"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    junit testResults: '**/build/test-results/integrationTest/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('E2E Tests') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh "${GRADLE} e2eTest"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    junit testResults: '**/build/test-results/e2eTest/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Code Coverage') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh "${GRADLE} jacocoTestReport"
+                            jacoco(
+                                execPattern: '**/build/jacoco/*.exec',
+                                classPattern: '**/build/classes',
+                                sourcePattern: '**/src/main/java',
+                                inclusionPattern: '**/*.class',
+                                changeBuildStatus: true,
+                                minimumLineCoverage: '50',
+                                minimumBranchCoverage: '50'
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            sh "${GRADLE} bootJar"
+                            sh 'ls -lh build/libs/'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            script {
+                                def image = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                                image.tag("latest")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Docker Deploy') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        dir("${APP_DIR}") {
+                            script {
+                                sh """
+                                    docker stop ${DOCKER_CONTAINER} 2>/dev/null || true
+                                    docker rm ${DOCKER_CONTAINER} 2>/dev/null || true
+                                """
+                                sh """
+                                    docker run -d \
+                                        --name ${DOCKER_CONTAINER} \
+                                        --network ${DOCKER_NETWORK} \
+                                        -p 8081:8080 \
+                                        -e SPRING_PROFILES_ACTIVE=docker \
+                                        -e JAVA_OPTS="-Xmx512m -Xms256m" \
+                                        --restart unless-stopped \
+                                        --health-cmd="wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1" \
+                                        --health-interval=30s \
+                                        --health-timeout=3s \
+                                        --health-start-period=30s \
+                                        --health-retries=3 \
+                                        ${DOCKER_IMAGE}:${DOCKER_TAG}
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        script {
+                            timeout(time: 90, unit: 'SECONDS') {
+                                waitUntil {
+                                    def response = sh(
+                                        script: "curl -sf ${APP_URL}/actuator/health 2>/dev/null || echo FAILED",
+                                        returnStdout: true
+                                    ).trim()
+                                    return response.contains('"status":"UP"')
+                                }
+                            }
+                        }
+                        echo 'Application is healthy and running!'
+                        sh "curl -s ${APP_URL}/actuator/health"
+                    }
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm']) {
+                    timestamps {
+                        script {
+                            echo 'Running smoke tests against deployed application...'
+
+                            def createResponse = sh(
+                                script: """
+                                    curl -sf -X POST ${APP_URL}/api/products \
+                                        -H "Content-Type: application/json" \
+                                        -d '{"name":"Smoke Test Product","price":9.99,"quantity":1}'
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            echo "Create response: ${createResponse}"
+
+                            def listResponse = sh(
+                                script: "curl -sf ${APP_URL}/api/products",
+                                returnStdout: true
+                            ).trim()
+                            echo "List response: ${listResponse}"
+
+                            def healthResponse = sh(
+                                script: "curl -sf ${APP_URL}/actuator/health",
+                                returnStdout: true
+                            ).trim()
+                            echo "Health response: ${healthResponse}"
+
+                            def infoResponse = sh(
+                                script: "curl -sf ${APP_URL}/actuator/info 2>/dev/null || echo INFO_NOT_AVAILABLE",
+                                returnStdout: true
+                            ).trim()
+                            echo "Info response: ${infoResponse}"
+                        }
+                        echo 'Smoke tests passed!'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+            ========================================
+            BUILD SUCCESSFUL - Build #${env.BUILD_NUMBER}
+            ========================================
+            Application: ${DOCKER_IMAGE}:${DOCKER_TAG}
+            Status: Deployed on the compose network (host port 8081)
+            Health: http://localhost:8081/actuator/health
+            API: http://localhost:8081/api/products
+            ========================================
+            """
+        }
+        failure {
+            echo """
+            ========================================
+            BUILD FAILED - Build #${env.BUILD_NUMBER}
+            ========================================
+            Check the logs above for details.
+            ========================================
+            """
+            script {
+                sh "docker stop ${DOCKER_CONTAINER} 2>/dev/null || true"
+                sh "docker rm ${DOCKER_CONTAINER} 2>/dev/null || true"
+            }
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

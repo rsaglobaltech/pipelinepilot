@@ -1,0 +1,119 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('testcontainersVersion', '1.19.8')
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'org.awaitility:awaitility:4.2.1'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVersion}"
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+    reportsDirectory = layout.buildDirectory.dir('jacoco')
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+task unitTest(type: Test) {
+    useJUnitPlatform()
+    description = 'Runs unit tests only'
+    group = 'verification'
+    include '**/ProductServiceTest.class'
+    include '**/ProductControllerTest.class'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    reports {
+        junitXml.required = true
+        html.required = true
+    }
+}
+
+task integrationTest(type: Test) {
+    useJUnitPlatform()
+    description = 'Runs integration tests with Testcontainers'
+    group = 'verification'
+    include '**/*IntegrationTest.class'
+    shouldRunAfter unitTest
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    reports {
+        junitXml.required = true
+        html.required = true
+    }
+
+    systemProperty 'containers.testcontainers.reuse.enable', 'true'
+}
+
+task e2eTest(type: Test) {
+    useJUnitPlatform()
+    description = 'Runs end-to-end tests'
+    group = 'verification'
+    include '**/*E2ETest.class'
+    shouldRunAfter integrationTest
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    reports {
+        junitXml.required = true
+        html.required = true
+    }
+
+    systemProperty 'containers.testcontainers.reuse.enable', 'true'
+}
+
+bootJar {
+    archiveBaseName = 'products-api'
+    archiveVersion = project.version
+}
+
+clean {
+    delete layout.buildDirectory
+}

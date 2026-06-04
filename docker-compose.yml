@@ -1,0 +1,24 @@
+# PipelinePilot demo stack.
+#   docker compose up -d --build
+#   open http://localhost:8080   (admin / admin)
+# Companion IDE API served at http://localhost:8080/ide/*
+services:
+  jenkins:
+    build:
+      context: ./jenkins-plugin
+      dockerfile: docker/Dockerfile
+    container_name: pipelinepilot-jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # Let pipelines drive the host Docker daemon (docker.build / sh 'docker ...').
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Run as root so the mounted docker socket is usable on Docker Desktop / Linux.
+    user: root
+    group_add:
+      - "0"
+
+volumes:
+  jenkins_home: {}

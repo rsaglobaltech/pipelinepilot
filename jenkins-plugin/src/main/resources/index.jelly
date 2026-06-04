@@ -1,0 +1,6 @@
+<?jelly escape-by-default='true'?>
+<div>
+    PipelinePilot Companion — IDE-facing APIs (<code>/ide/...</code>) backing the
+    PipelinePilot for Jenkins IntelliJ plugin: remote validation, sandbox execution,
+    replay, and progressive log streaming.
+</div>

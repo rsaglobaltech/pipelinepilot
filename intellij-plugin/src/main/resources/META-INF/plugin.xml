@@ -1,0 +1,112 @@
+
+<idea-plugin url="https://github.com/pipelinepilot/pipelinepilot">
+    <id>com.pipelinepilot</id>
+    <name>PipelinePilot for Jenkins</name>
+    <vendor email="support@pipelinepilot.dev" url="https://pipelinepilot.dev">PipelinePilot</vendor>
+
+    <description><![CDATA[
+        Edit, validate and run Jenkins pipelines from the IDE without the commit-push-wait loop.
+        <br/><br/>
+        <b>PipelinePilot</b> brings a fast, interactive workflow to Jenkins Pipeline development.
+        Instead of emulating Jenkins locally, it connects your IDE to a real Jenkins instance:
+        the editor handles the experience, Jenkins handles validation and execution on real
+        agents, plugins, shared libraries and credentials.
+        <br/><br/>
+        <b>Features</b>
+        <ul>
+          <li><b>Instant validation</b> — inline diagnostics from the Jenkins declarative linter, on save or on demand.</li>
+          <li><b>Quick-fixes</b> — deterministic and AI-assisted intentions on linter errors.</li>
+          <li><b>Remote sandbox execution</b> — press Ctrl+Enter to run the current Jenkinsfile on real Jenkins, isolated and ephemeral.</li>
+          <li><b>Live logs &amp; stage graph</b> — streamed console output and a visual graph of sequential, parallel and nested stages.</li>
+          <li><b>Replay</b> — rerun the whole pipeline, only failed stages, or a single stage.</li>
+          <li><b>Shared library awareness</b> — @Library detection, step autocomplete and navigation into vars/.</li>
+          <li><b>AI assistance</b> — inline review with per-line findings and one-click fixes, via any OpenAI-compatible provider (OpenAI, OpenRouter, Ollama, LM Studio, custom gateways).</li>
+        </ul>
+        <b>Getting started</b>
+        <ol>
+          <li>Open <i>Settings | Tools | PipelinePilot for Jenkins</i> and set your Jenkins URL, username and API token.</li>
+          <li>Open a <code>Jenkinsfile</code> and save it to see inline validation.</li>
+          <li>Press <b>Ctrl+Enter</b> to run it in a remote sandbox and watch logs and stages stream back.</li>
+        </ol>
+        <b>Links:</b>
+        <a href="https://github.com/pipelinepilot/pipelinepilot">Documentation &amp; source</a> &middot;
+        <a href="https://github.com/pipelinepilot/pipelinepilot/issues">Issue tracker</a>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <b>0.1.0</b>
+        <ul>
+          <li>Jenkinsfile validation with inline diagnostics and quick-fixes.</li>
+          <li>Remote sandbox execution with live log streaming and a stage graph.</li>
+          <li>Replay (whole pipeline / failed stages / single stage).</li>
+          <li>Shared library awareness: completion and navigation.</li>
+          <li>AI review popup with per-line findings; provider-agnostic (OpenAI-compatible).</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <!-- Groovy is optional: core features (settings, tool window, sandbox) load
+         without it; Groovy-specific editor features come from the config-file. -->
+    <depends optional="true" config-file="pipelinepilot-groovy.xml">org.intellij.groovy</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Persisted connection settings (Jenkins URL + token). -->
+        <applicationService
+            serviceImplementation="com.pipelinepilot.settings.PipelinePilotSettings"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.pipelinepilot.settings.PipelinePilotConfigurable"
+            id="com.pipelinepilot.settings"
+            displayName="PipelinePilot for Jenkins"/>
+
+        <!-- Associate Jenkinsfile naming patterns with Groovy on project open. -->
+        <postStartupActivity
+            implementation="com.pipelinepilot.JenkinsfileAssociationActivity"/>
+
+        <notificationGroup id="PipelinePilot" displayType="BALLOON"/>
+
+        <!-- Phase 2: sandbox execution + log streaming -->
+        <projectService serviceImplementation="com.pipelinepilot.sandbox.PipelinePilotLogConsole"/>
+        <projectService serviceImplementation="com.pipelinepilot.sandbox.SandboxService"/>
+        <projectService serviceImplementation="com.pipelinepilot.sandbox.StageGraphModel"/>
+
+        <!-- Phase 4: AI assistance -->
+        <projectService serviceImplementation="com.pipelinepilot.ai.AiAssistant"/>
+        <projectService serviceImplementation="com.pipelinepilot.ai.AiFindingsHolder"/>
+
+        <toolWindow id="PipelinePilot"
+                    anchor="bottom"
+                    canCloseContents="false"
+                    factoryClass="com.pipelinepilot.toolwindow.PipelinePilotToolWindowFactory"/>
+    </extensions>
+
+    <actions>
+        <action id="com.pipelinepilot.ValidateJenkinsfile"
+                class="com.pipelinepilot.actions.ValidateJenkinsfileAction"
+                text="Validate Jenkinsfile"
+                description="Validate the current Jenkinsfile against the remote Jenkins linter">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt V"/>
+        </action>
+        <action id="com.pipelinepilot.RunInSandbox"
+                class="com.pipelinepilot.actions.RunInSandboxAction"
+                text="Run in Sandbox"
+                description="Run the current Jenkinsfile in a remote Jenkins sandbox and stream logs">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control ENTER"/>
+        </action>
+        <action id="com.pipelinepilot.ReplayPipeline"
+                class="com.pipelinepilot.actions.ReplayPipelineAction"
+                text="Replay Pipeline"
+                description="Replay the last sandbox pipeline run">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="com.pipelinepilot.AnalyzePipeline"
+                class="com.pipelinepilot.actions.AnalyzePipelineAction"
+                text="Analyze Pipeline (AI)"
+                description="Get AI optimization and best-practice recommendations for this Jenkinsfile">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

@@ -1,0 +1,29 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // NOTE: `checkout scm` needs an SCM-bound job (Multibranch / Pipeline-from-SCM).
+                // The IDE sandbox runs inline pipeline content with no SCM context, so use an
+                // explicit clone instead, e.g.:  git url: 'https://github.com/me/repo.git'
+                echo 'Checkout (sandbox: no SCM binding — use explicit git in real runs)'
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Building... (replace with sh "./gradlew build" against a real checkout)'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Testing...'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Deploying...'
+            }
+        }
+    }
+}

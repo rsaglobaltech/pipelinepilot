@@ -1,0 +1,13 @@
+workflow-aggregator
+pipeline-model-definition
+pipeline-stage-view
+cloudbees-folder
+configuration-as-code
+job-dsl
+# Steps used by the demo Products API pipeline
+ansicolor
+timestamper
+junit
+jacoco
+ws-cleanup
+docker-workflow
