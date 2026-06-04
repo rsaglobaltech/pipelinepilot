@@ -108,5 +108,12 @@
                 description="Get AI optimization and best-practice recommendations for this Jenkinsfile">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+        <action id="com.pipelinepilot.FormatJenkinsfile"
+                class="com.pipelinepilot.actions.FormatJenkinsfileAction"
+                text="Format Jenkinsfile"
+                description="Reformat the current Jenkinsfile using the IDE code formatter">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt shift P"/>
+        </action>
     </actions>
 </idea-plugin>
